@@ -32,4 +32,3 @@ void Autopilot::setDistance(int distance)
         emit dataMoveReceived(x, y);
     }
 }
-
