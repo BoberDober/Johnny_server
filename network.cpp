@@ -6,11 +6,19 @@ Network::Network(QObject *parent) : QObject(parent)
     connected = false;
     server = new QTcpServer();
     connect(server, SIGNAL(newConnection()), this, SLOT(newConnection()));
+    clientSocket = new QTcpSocket(this);
 
     if (!server->listen(QHostAddress::Any, 8000))
         qDebug() <<  QObject::tr("Unable to start the server: %1.").arg(server->errorString());
     else
-        qDebug() << QString::fromUtf8("Server START");
+        qDebug() << "Server START";
+
+    clientSocketMove = new QUdpSocket();
+    if (!clientSocketMove->bind(QHostAddress::Any, 8001))
+        qDebug() << "Server move FAILED";
+    else
+        qDebug() << "Server move START";
+    connect(clientSocketMove, SIGNAL(readyRead()), this, SLOT(readMoveSignal()));
 }
 
 void Network::newConnection()
@@ -20,13 +28,10 @@ void Network::newConnection()
     else
     {
         qDebug() << "NEW CONNECTION";
-        clientSocket = new QTcpSocket();
         clientSocket = server->nextPendingConnection();
-
         connect(clientSocket, SIGNAL(readyRead()), this, SLOT(onReadyRead()));
         connect(clientSocket, SIGNAL(connected()), this, SLOT(onConnected()));
         connect(clientSocket, SIGNAL(disconnected()), this, SLOT(onDisconnected()));
-
         qDebug() << clientSocket->peerAddress() << clientSocket->peerPort();
         connected = true;
     }
@@ -35,6 +40,13 @@ void Network::newConnection()
 void Network::onReadyRead()
 {
     qDebug() << "NEW DATA";
+    QByteArray datagram;
+    QString jsonStr;
+    datagram = clientSocket->readAll();
+    qDebug() << datagram.size();
+    QDataStream ds(&datagram, QIODevice::ReadOnly);
+    ds >> jsonStr;
+    emit dataReceived(jsonStr);
 }
 
 void Network::onConnected()
@@ -47,18 +59,31 @@ void Network::onDisconnected()
 {
     qDebug() << "DISCONNECTED";
     connected = false;
-    delete clientSocket;
 }
 
-void Network::sendData(float flatTemperature, float flatHumidity, float outsideTemperature, float outsideHumidity)
+void Network::sendData(QString data)
 {
     if(connected)
     {
-        qDebug() << flatTemperature << flatHumidity << outsideTemperature << outsideHumidity;
         QByteArray arr;
         QDataStream ds(&arr, QIODevice::WriteOnly);
-        ds.setFloatingPointPrecision(QDataStream::SinglePrecision);
-        ds << flatTemperature << flatHumidity << outsideTemperature << outsideHumidity;
+        ds << data;
         qDebug() << "SEND" << clientSocket->write(arr);
     }
+}
+
+void Network::readMoveSignal()
+{
+//    int type = 0;
+//    int x = 0;
+//    int y = 0;
+    qDebug() << "MOVE DATA";
+    QByteArray datagram;
+    datagram.resize(clientSocketMove->pendingDatagramSize());
+    QHostAddress *address = new QHostAddress();
+    clientSocketMove->readDatagram(datagram.data(), datagram.size(), address);
+//    QDataStream ds(&datagram, QIODevice::ReadOnly);
+//    ds >> type >> x >> y;
+//    qDebug() << x << y;
+    emit dataMoveReceived(datagram);
 }

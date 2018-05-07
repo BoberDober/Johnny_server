@@ -2,7 +2,6 @@ QT += core network
 QT -= gui
 
 CONFIG += c++11
-#LIBS += -lrf24-bcm
 
 TARGET = Johnny
 CONFIG += console
@@ -10,10 +9,24 @@ CONFIG -= app_bundle
 
 TEMPLATE = app
 
+CONFIG(NOTPI):{
+    message("NOT raspberry pi build.")
+}else{
+    message("raspberry pi build.")
+    LIBS += -lrf24-bcm
+    LIBS += -lwiringPi
+    DEFINES += PI
+}
+
 SOURCES += main.cpp \
     core.cpp \
     network.cpp \
-    radio.cpp
+    radio.cpp \
+    motor.cpp \
+    control.cpp \
+    ultrasonic.cpp \
+    steppermotor.cpp \
+    autopilot.cpp
 
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which as been marked deprecated (the exact warnings
@@ -29,4 +42,9 @@ DEFINES += QT_DEPRECATED_WARNINGS
 HEADERS += \
     core.h \
     network.h \
-    radio.h
+    radio.h \
+    motor.h \
+    control.h \
+    ultrasonic.h \
+    steppermotor.h \
+    autopilot.h

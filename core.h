@@ -3,26 +3,53 @@
 
 #include <QObject>
 #include <QTimer>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QDataStream>
 #include "network.h"
 #include "radio.h"
+#include "control.h"
+#include "ultrasonic.h"
+#include "autopilot.h"
 
-class Core : public QObject
+struct LedPower {
+    int redPower;
+    int greenPower;
+    int bluePower;
+};
+
+struct DHTData {
+    float temperature;
+    float humidity;
+};
+
+class Core: public QObject
 {
     Q_OBJECT
     Network *network;
     Radio *radio;
-    QTimer *timer1;
-    QTimer *timer2;
-    float data[4];
+    Control *control;
+    Ultrasonic *ultrasonic;
+    Autopilot *autopitol;
+
+    LedPower top_led;
+    LedPower bottom_led;
+    DHTData flat;
+    DHTData outside;
+
+    TypeControl typeControl;
+    bool neon;
+
+
 public:
     explicit Core(QObject *parent = 0);
-    void johnnysLife();
 signals:
-    void changeData(float d1, float d2);
+    void dataLED(int type, int r, int g, int b);
+    void dataMoveReceived(QByteArray);
 public slots:
-    void dataRadio();
-    void dataBT();
-
+    void dataRecieved(QString jsonStr);
+    void sendData(uint8_t pipe, QByteArray data);
+    void dataMoveControl(QByteArray data);
 };
 
 #endif // CORE_H

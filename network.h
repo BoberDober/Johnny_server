@@ -12,22 +12,21 @@ class Network : public QObject
 {
     Q_OBJECT
     QTcpServer *server;
-    QTcpSocket* clientSocket;
-//    QHostAddress ip_client;
-//    quint16 port_client;
+    QTcpSocket *clientSocket;
+    QUdpSocket *clientSocketMove;
     bool connected;
 public:
     explicit Network(QObject *parent = 0);
 signals:
-
+    void dataReceived(QString jsonStr);
+    void dataMoveReceived(QByteArray datagram);
 public slots:
     void newConnection();
-
     void onReadyRead();
     void onConnected();
     void onDisconnected();
-
-    void sendData(float flatTemperature, float flatHumidity, float outsideTemperature, float outsideHumidity);
+    void sendData(QString data);
+    void readMoveSignal();
 };
 
 #endif // NETWORK_H
