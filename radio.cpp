@@ -5,6 +5,10 @@
 Radio::Radio(QObject *parent) : QObject(parent)
 {
     timer = new QTimer();
+    timer_connected1 = new QTimer();
+    timer_connected2 = new QTimer();
+    connected1 = false;
+    connected2 = false;
     typewrite = NONE;
 #ifdef PI
 //    radio = new RF24(22,0);
@@ -31,12 +35,19 @@ Radio::Radio(QObject *parent) : QObject(parent)
 
 #endif
     connect(timer,SIGNAL(timeout()), this, SLOT(listener()));
+    connect(timer_connected1,SIGNAL(timeout()), this, SLOT(connectedRadio1()));
+    connect(timer_connected2,SIGNAL(timeout()), this, SLOT(connectedRadio2()));
+
     valueLight[0] = 0;
     valueLight[1] = 0;
     valueLight[2] = 0;
     valueLight[3] = 0;
     timer->setInterval(2000);
+    timer_connected1->setInterval(5000);
+    timer_connected2->setInterval(5000);
     timer->start();
+    timer_connected1->start();
+    timer_connected2->start();
 }
 
 void Radio::sendData(Typewrite type, QByteArray data) // передавать char
@@ -46,34 +57,48 @@ void Radio::sendData(Typewrite type, QByteArray data) // передавать ch
     case LED:
         int buffer[4];
         datastream >> buffer[0] >> buffer[1] >> buffer[2] >> buffer[3];
-        qDebug() << "STATUS - " << buffer[0] << buffer[1] << buffer[2] << buffer[3];
+//        qDebug() << "STATUS - " << buffer[0] << buffer[1] << buffer[2] << buffer[3];
         #ifdef PI
             radio->stopListening();
             radio->openWritingPipe(pipes[3]);
-            if (!radio->write(&buffer, sizeof(buffer)))
-                qDebug() << "---FAILED SEND DATA---";
-            else
-                qDebug() << "---SUCCSESS SEND DATA---";
+            radio->write(&buffer, sizeof(buffer));
+//            if (!radio->write(&buffer, sizeof(buffer)))
+//                qDebug() << "---FAILED SEND DATA---";
+//            else
+//                qDebug() << "---SUCCSESS SEND DATA---";
             radio->startListening();
         #endif
         break;
     case NEON:
         bool status;
         datastream >> status;
-        qDebug() << "STATUS - " << status;
+//        qDebug() << "STATUS - " << status;
         #ifdef PI
             radio->stopListening();
             radio->openWritingPipe(pipes[1]);
-            if (!radio->write(&status, sizeof(status)))
-                qDebug() << "---FAILED SEND DATA---";
-            else
-                qDebug() << "---SUCCSESS SEND DATA---";
+            radio->write(&status, sizeof(status));
+//            if (!radio->write(&status, sizeof(status)))
+//                qDebug() << "---FAILED SEND DATA---";
+//            else
+//                qDebug() << "---SUCCSESS SEND DATA---";
             radio->startListening();
         #endif
         break;
     default:
         break;
     }
+}
+
+void Radio::connectedRadio1()
+{
+    connected1 = false;
+    emit connectedRadio(1, connected1);
+}
+
+void Radio::connectedRadio2()
+{
+    connected2 = false;
+    emit connectedRadio(2, connected2);
 }
 
 void Radio::listener()
@@ -87,17 +112,24 @@ void Radio::listener()
         QByteArray array;
         QDataStream datastream(&array, QIODevice::WriteOnly);
         radio->read(data, sizeof(data));
-        qDebug() << data[0] << " " << data[1];
+//        qDebug() << data[0] << " " << data[1];
         datastream << data[0] << data[1];
+        if(pipe == 1)
+        {
+            timer_connected1->start();
+            connected1 = true;
+//            if(!connected1)
+                emit connectedRadio(1, connected1);
+        }
+        else if(pipe == 2)
+        {
+            timer_connected2->start();
+            connected2 = true;
+//            if(!connected2)
+                emit connectedRadio(2, connected2);
+        }
         emit dataChange(pipe, array);
     }
 //    radio->stopListening();
 #endif
-//    float outsideData[2];
-//    outsideData[0] = 12.34;
-//    outsideData[1] = 56.78;
-//    QByteArray array;
-//    QDataStream datastream(&array, QIODevice::WriteOnly);
-//    datastream << outsideData[0] << outsideData[1];
-//    emit dataChange(1, array);
 }

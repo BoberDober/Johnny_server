@@ -20,6 +20,7 @@ public:
 signals:
     void dataReceived(QString jsonStr);
     void dataMoveReceived(QByteArray datagram);
+    void changeConnected(bool);
 public slots:
     void newConnection();
     void onReadyRead();

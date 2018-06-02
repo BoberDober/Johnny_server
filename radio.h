@@ -21,6 +21,10 @@ class Radio : public QObject
     RF24 *radio;
 #endif
     QTimer *timer;
+    QTimer *timer_connected1;
+    QTimer *timer_connected2;
+    bool connected1;
+    bool connected2;
     Typewrite typewrite;
 //    const uint64_t pipes[2] = { 0xAABBCC4400LL, 0xAABBCC1100LL};
 //    const uint64_t pipes[4] = { 0xAABBCC1111LL, 0xAABBCC1100LL, 0xAABBCC2211LL, 0xAABBCC2200LL};
@@ -30,8 +34,11 @@ public:
     explicit Radio(QObject *parent = 0);
 signals:
     void dataChange(uint8_t, QByteArray);
+    void connectedRadio(int pipe, bool status);
 public slots:
     void sendData(Typewrite type, QByteArray data);
+    void connectedRadio1();
+    void connectedRadio2();
     void listener();
 };
 

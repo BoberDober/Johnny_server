@@ -4,13 +4,16 @@
 Core::Core(QObject *parent) : QObject(parent)
 {
     qDebug() << "CORE";
-
-    network = new Network();
-    radio = new Radio();
-    control = new Control(29, 25, 28, 27, 24, 23);
-    ultrasonic = new Ultrasonic(0, 2);
+    thread = new QThread(this);
+    network = new Network(this);
+    radio = new Radio(this);
+    control = new Control(29, 25, 28, 27, 24, 23, this);
+    ultrasonic = new Ultrasonic(0, 2, this);
     autopitol = new Autopilot();
 
+    autopitol->moveToThread(thread);
+
+    connectedClient = false;
     top_led.redPower = 0;
     top_led.greenPower = 0;
     top_led.bluePower = 0;
@@ -27,11 +30,23 @@ Core::Core(QObject *parent) : QObject(parent)
 
     neon = false;
 
+    connectedRadio1 = false;
+    connectedRadio2 = false;
+
     connect(radio, SIGNAL(dataChange(uint8_t, QByteArray)), this, SLOT(sendData(uint8_t, QByteArray)));
+    connect(radio, SIGNAL(connectedRadio(int,bool)),this, SLOT(changeConnectedRadio(int,bool)));
     connect(network, SIGNAL(dataReceived(QString)), this, SLOT(dataRecieved(QString)));
     connect(network, SIGNAL(dataMoveReceived(QByteArray)),this, SLOT(dataMoveControl(QByteArray)));
-    connect(autopitol, SIGNAL(dataMoveReceived(int, int)), control, SLOT(move(int, int)));
+    connect(network, SIGNAL(changeConnected(bool)), this, SLOT(changeConnectedClient(bool)));
+
+    connect(thread, SIGNAL(finished()), autopitol, SLOT(deleteLater()));
+    connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
+
+    connect(this, SIGNAL(setStatus(Autopilot::Status)), autopitol,SLOT(setStatus(Autopilot::Status)));
     connect(ultrasonic, SIGNAL(distanceChange(int)), autopitol, SLOT(setDistance(int)));
+    connect(ultrasonic, SIGNAL(distanceChange(int)), this, SLOT(sendDataDistance(int)));
+
+    thread->start();
 }
 
 void Core::dataRecieved(QString jsonStr)
@@ -49,6 +64,9 @@ void Core::dataRecieved(QString jsonStr)
             int green = jsonTmpObj.value("GREEN").toDouble();
             int blue = jsonTmpObj.value("BLUE").toDouble();
             int type = 0;
+            top_led.redPower = red;
+            top_led.greenPower = green;
+            top_led.bluePower = blue;
             datastream  << type << red << green << blue;
         }
         else if(key == "LED_BOTTOM")
@@ -59,16 +77,20 @@ void Core::dataRecieved(QString jsonStr)
             int green = jsonTmpObj.value("GREEN").toDouble();
             int blue = jsonTmpObj.value("BLUE").toDouble();
             int type = 1;
+            bottom_led.redPower = red;
+            bottom_led.greenPower = green;
+            bottom_led.bluePower = blue;
             datastream  << type << red << green << blue;
         }
         else if(key == "NEON")
         {
             type = NEON;
-            qDebug() << jsonOut.value(key).toBool();
-            datastream << jsonOut.value(key).toBool();
+            neon = jsonOut.value(key).toBool();
+            datastream << neon;
         }
         radio->sendData(type, data);
     }
+    showData();
 }
 
 void Core::sendData(uint8_t pipe, QByteArray data)
@@ -78,8 +100,11 @@ void Core::sendData(uint8_t pipe, QByteArray data)
 
     if(pipe==1)
     {
-        qDebug() << "PIPE 1";
         datastream >> flat.temperature >> flat.humidity;
+        if(flat.temperature != flat.temperature)
+            flat.temperature = 0;
+        if(flat.humidity != flat.humidity)
+            flat.humidity = 0;
         QJsonObject jsonTmp;
         jsonTmp["TEMPERATURE"] = flat.temperature;
         jsonTmp["HUMIDITY"] = flat.humidity;
@@ -87,15 +112,32 @@ void Core::sendData(uint8_t pipe, QByteArray data)
     }
     else if(pipe==2)
     {
-        qDebug() << "PIPE 2";
         datastream >> outside.temperature >> outside.humidity;
+        if(outside.temperature != outside.temperature)
+            outside.temperature = 0;
+        if(outside.humidity != outside.humidity)
+            outside.humidity = 0;
         QJsonObject jsonTmp;
         jsonTmp["TEMPERATURE"] = outside.temperature;
         jsonTmp["HUMIDITY"] = outside.humidity;
         jsonObj["DHT_OUTSIDE"] = jsonTmp;
     }
-    else
-        qDebug() << "UNKNOWN PIPE";
+//    else
+//        qDebug() << "UNKNOWN PIPE";
+
+    QJsonDocument jsonDoc(jsonObj);
+    QString strJson(jsonDoc.toJson(QJsonDocument::Compact));
+    network->sendData(strJson);
+    showData();
+}
+
+void Core::sendDataDistance(int distance)
+{
+    QJsonObject jsonObj;
+    QJsonObject jsonTmp;
+
+    jsonTmp["DISTANCE"] = distance;
+    jsonObj["ULTRASONIC"] = jsonTmp;
 
     QJsonDocument jsonDoc(jsonObj);
     QString strJson(jsonDoc.toJson(QJsonDocument::Compact));
@@ -107,17 +149,61 @@ void Core::dataMoveControl(QByteArray data)
     int tmp_typeControl;
     QDataStream ds(&data, QIODevice::ReadOnly);
     ds >> tmp_typeControl;
-    typeControl= (TypeControl)tmp_typeControl;
+    typeControl = static_cast<TypeControl>(tmp_typeControl);
     if(typeControl == TypeControl::AUTONOMUS)
     {
-        autopitol->setStatus(Status::START);
+        connect(autopitol, SIGNAL(dataMoveReceived(int, int)), control, SLOT(move(int, int)));
+        emit setStatus(Autopilot::START);
     }
     else if(typeControl == TypeControl::CONTROL)
     {
+        disconnect(autopitol, SIGNAL(dataMoveReceived(int, int)), control, SLOT(move(int, int)));
         int x = 0;
         int y = 0;
         ds >> x >> y;
-        autopitol->setStatus(Status::STOP);
+        emit setStatus(Autopilot::STOP);
         control->move(x, y);
     }
+}
+
+void Core::changeConnectedRadio(int pipe, bool status)
+{
+    if(pipe == 1)
+        connectedRadio1 = status;
+    if(!connectedRadio1)
+    {
+        flat.temperature = 0;
+        flat.humidity = 0;
+    }
+    if(pipe == 2)
+        connectedRadio2 = status;
+    if(!connectedRadio2)
+    {
+        outside.temperature = 0;
+        outside.humidity = 0;
+    }
+    showData();
+}
+
+void Core::changeConnectedClient(bool connected)
+{
+    connectedClient = connected;
+}
+
+void Core::showData()
+{
+    qDebug() << "--------------------";
+    qDebug() << Q_FUNC_INFO;
+
+    qDebug() << "CLIENT CONNECTED - " << connectedClient;
+    qDebug() << "MODULE 1 STATUS - " << connectedRadio1;
+    qDebug() << "MODULE 2 STATUS - " << connectedRadio2;
+
+    qDebug() << "TOP LED - " << top_led.redPower << top_led.greenPower << top_led.bluePower;
+    qDebug() << "BOTTOM LED - " << bottom_led.redPower << bottom_led.greenPower << bottom_led.bluePower;
+
+    qDebug() << "FLAT DHT - " << flat.temperature << flat.humidity;
+    qDebug() << "OUTSIDE DHT - " << outside.temperature << outside.humidity;
+
+    qDebug() << "NEON STATUS - " << neon;
 }

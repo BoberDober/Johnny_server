@@ -2,15 +2,14 @@
 
 Control::Control(int eA, int in1, int in2, int eB, int in3, int in4, QObject *parent) : QObject(parent)
 {
-//    autopitol = new Autopilot();
     typeControl = TypeControl::CONTROL;
     leftMotor = new Motor(eA, in1, in2);
-    rightMotor = new Motor(eB, in4, in3);
-//    connect(this, SIGNAL(changeDistance(int)), autopitol, SLOT(setDistance(int)));
+    rightMotor = new Motor(eB, in3, in4);
 }
 
 void Control::move(int x, int y)
 {
+//    qDebug() << Q_FUNC_INFO << x << y;
     static int powerTable[6][11] =
     {
                                                 //н

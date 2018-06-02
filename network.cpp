@@ -34,16 +34,17 @@ void Network::newConnection()
         connect(clientSocket, SIGNAL(disconnected()), this, SLOT(onDisconnected()));
         qDebug() << clientSocket->peerAddress() << clientSocket->peerPort();
         connected = true;
+        changeConnected(connected);
     }
 }
 
 void Network::onReadyRead()
 {
-    qDebug() << "NEW DATA";
+//    qDebug() << "NEW DATA";
     QByteArray datagram;
     QString jsonStr;
     datagram = clientSocket->readAll();
-    qDebug() << datagram.size();
+//    qDebug() << datagram.size();
     QDataStream ds(&datagram, QIODevice::ReadOnly);
     ds >> jsonStr;
     emit dataReceived(jsonStr);
@@ -53,12 +54,14 @@ void Network::onConnected()
 {
     qDebug() << "CONNECTED";
     connected = true;
+    changeConnected(connected);
 }
 
 void Network::onDisconnected()
 {
     qDebug() << "DISCONNECTED";
     connected = false;
+    changeConnected(connected);
 }
 
 void Network::sendData(QString data)
@@ -68,22 +71,16 @@ void Network::sendData(QString data)
         QByteArray arr;
         QDataStream ds(&arr, QIODevice::WriteOnly);
         ds << data;
-        qDebug() << "SEND" << clientSocket->write(arr);
+        clientSocket->write(arr);
     }
 }
 
 void Network::readMoveSignal()
 {
-//    int type = 0;
-//    int x = 0;
-//    int y = 0;
-    qDebug() << "MOVE DATA";
+//    qDebug() << "MOVE DATA";
     QByteArray datagram;
     datagram.resize(clientSocketMove->pendingDatagramSize());
     QHostAddress *address = new QHostAddress();
     clientSocketMove->readDatagram(datagram.data(), datagram.size(), address);
-//    QDataStream ds(&datagram, QIODevice::ReadOnly);
-//    ds >> type >> x >> y;
-//    qDebug() << x << y;
     emit dataMoveReceived(datagram);
 }

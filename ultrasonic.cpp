@@ -23,7 +23,6 @@ void Ultrasonic::getDistance()
 {
     int distance = 0;
 #ifdef PI
-
     volatile long startTimeUsec;
     volatile long endTimeUsec;
     long travelTimeUsec;
@@ -43,7 +42,8 @@ void Ultrasonic::getDistance()
     distance = 100*((travelTimeUsec/1000000.0)*340.29)/2;
 
 #endif
-    emit distanceChange(distance);
+    if(distance < 3000) // костыль
+        emit distanceChange(distance);
 }
 
 ////Send trig pulse

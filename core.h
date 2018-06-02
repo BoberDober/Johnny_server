@@ -6,6 +6,7 @@
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QDataStream>
+#include <QThread>
 #include "network.h"
 #include "radio.h"
 #include "control.h"
@@ -32,24 +33,32 @@ class Core: public QObject
     Ultrasonic *ultrasonic;
     Autopilot *autopitol;
 
+    bool connectedClient;
     LedPower top_led;
     LedPower bottom_led;
     DHTData flat;
     DHTData outside;
-
+    QThread *thread;
+    bool connectedRadio1;
+    bool connectedRadio2;
     TypeControl typeControl;
     bool neon;
 
 
 public:
     explicit Core(QObject *parent = 0);
+    void showData();
 signals:
     void dataLED(int type, int r, int g, int b);
     void dataMoveReceived(QByteArray);
+    void setStatus(Autopilot::Status status);
 public slots:
     void dataRecieved(QString jsonStr);
     void sendData(uint8_t pipe, QByteArray data);
+    void sendDataDistance(int distance);
     void dataMoveControl(QByteArray data);
+    void changeConnectedRadio(int pipe, bool status);
+    void changeConnectedClient(bool connected);
 };
 
 #endif // CORE_H

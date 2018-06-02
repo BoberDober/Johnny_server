@@ -27,7 +27,7 @@ void Motor::rotate(int pwm)
     #ifdef PI
         softPwmWrite(enA, pwm);
     #endif
-    qDebug() << pwm;
+    qDebug() << Q_FUNC_INFO << pwm;
 }
 
 void Motor::setDirection(Direction _direction)
