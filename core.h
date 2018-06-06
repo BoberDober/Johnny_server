@@ -43,6 +43,8 @@ class Core: public QObject
     bool connectedRadio2;
     TypeControl typeControl;
     bool neon;
+    int modeLEDTop;
+    int modeLEDBottom;
 
 
 public:

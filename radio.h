@@ -9,7 +9,7 @@
     #include <RF24/RF24.h>
 #endif
 
-enum Typewrite {NONE = 0, LED, NEON};
+enum Typewrite {NONE = 0, LED, LED_MODE, NEON};
 
 //0xAABBCC2211LL - модуль 2 read
 //0xAABBCC2200LL - модуль 2 write

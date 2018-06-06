@@ -30,6 +30,9 @@ Core::Core(QObject *parent) : QObject(parent)
 
     neon = false;
 
+    modeLEDTop = 0;
+    modeLEDBottom = 0;
+
     connectedRadio1 = false;
     connectedRadio2 = false;
 
@@ -55,40 +58,60 @@ void Core::dataRecieved(QString jsonStr)
     foreach (QString key, jsonOut.keys()) {
         QByteArray data;
         QDataStream datastream(&data, QIODevice::WriteOnly);
-        Typewrite type = NONE;
+        Typewrite typewrite = NONE;
         if(key == "LED_TOP")
         {
-            type = LED;
+            int typeLED = 0;
             QJsonObject jsonTmpObj = jsonOut.value(key).toObject();
-            int red = jsonTmpObj.value("RED").toDouble();
-            int green = jsonTmpObj.value("GREEN").toDouble();
-            int blue = jsonTmpObj.value("BLUE").toDouble();
-            int type = 0;
-            top_led.redPower = red;
-            top_led.greenPower = green;
-            top_led.bluePower = blue;
-            datastream  << type << red << green << blue;
+            if(jsonTmpObj.contains("COLOR"))
+            {
+                typewrite = LED;
+                int red = jsonTmpObj.value("COLOR").toObject().value("RED").toDouble();
+                int green = jsonTmpObj.value("COLOR").toObject().value("GREEN").toDouble();
+                int blue = jsonTmpObj.value("COLOR").toObject().value("BLUE").toDouble();
+                top_led.redPower = red;
+                top_led.greenPower = green;
+                top_led.bluePower = blue;
+                datastream  << typeLED << red << green << blue;
+            }
+
+            if(jsonTmpObj.contains("MODE"))
+            {
+                typewrite = LED_MODE;
+                modeLEDTop = jsonTmpObj.value("MODE").toInt();
+                datastream  << typeLED << modeLEDTop;
+            }
         }
         else if(key == "LED_BOTTOM")
         {
-            type = LED;
+            int typeLED = 1;
             QJsonObject jsonTmpObj = jsonOut.value(key).toObject();
-            int red = jsonTmpObj.value("RED").toDouble();
-            int green = jsonTmpObj.value("GREEN").toDouble();
-            int blue = jsonTmpObj.value("BLUE").toDouble();
-            int type = 1;
-            bottom_led.redPower = red;
-            bottom_led.greenPower = green;
-            bottom_led.bluePower = blue;
-            datastream  << type << red << green << blue;
+            if(jsonTmpObj.contains("COLOR"))
+            {
+                typewrite = LED;
+                int red = jsonTmpObj.value("COLOR").toObject().value("RED").toDouble();
+                int green = jsonTmpObj.value("COLOR").toObject().value("GREEN").toDouble();
+                int blue = jsonTmpObj.value("COLOR").toObject().value("BLUE").toDouble();
+                bottom_led.redPower = red;
+                bottom_led.greenPower = green;
+                bottom_led.bluePower = blue;
+                datastream  << typeLED << red << green << blue;
+            }
+
+            if(jsonTmpObj.contains("MODE"))
+            {
+                typewrite = LED_MODE;
+                modeLEDTop = jsonTmpObj.value("MODE").toInt();
+                datastream  << typeLED << modeLEDTop;
+            }
         }
         else if(key == "NEON")
         {
-            type = NEON;
+            typewrite = NEON;
             neon = jsonOut.value(key).toBool();
             datastream << neon;
         }
-        radio->sendData(type, data);
+        radio->sendData(typewrite, data);
     }
     showData();
 }
@@ -97,7 +120,6 @@ void Core::sendData(uint8_t pipe, QByteArray data)
 {
     QJsonObject jsonObj;
     QDataStream datastream(&data, QIODevice::ReadOnly);
-
     if(pipe==1)
     {
         datastream >> flat.temperature >> flat.humidity;
@@ -168,6 +190,9 @@ void Core::dataMoveControl(QByteArray data)
 
 void Core::changeConnectedRadio(int pipe, bool status)
 {
+    QJsonObject jsonObj;
+    QJsonObject jsonTmpModule1;
+    QJsonObject jsonTmpModule2;
     if(pipe == 1)
         connectedRadio1 = status;
     if(!connectedRadio1)
@@ -182,6 +207,13 @@ void Core::changeConnectedRadio(int pipe, bool status)
         outside.temperature = 0;
         outside.humidity = 0;
     }
+    jsonTmpModule1["STATUS"] = connectedRadio1;
+    jsonTmpModule2["STATUS"] = connectedRadio2;
+    jsonObj["MODULE1"] = jsonTmpModule1;
+    jsonObj["MODULE2"] = jsonTmpModule2;
+    QJsonDocument jsonDoc(jsonObj);
+    QString strJson(jsonDoc.toJson(QJsonDocument::Compact));
+    network->sendData(strJson);
     showData();
 }
 
@@ -194,16 +226,14 @@ void Core::showData()
 {
     qDebug() << "--------------------";
     qDebug() << Q_FUNC_INFO;
-
     qDebug() << "CLIENT CONNECTED - " << connectedClient;
     qDebug() << "MODULE 1 STATUS - " << connectedRadio1;
     qDebug() << "MODULE 2 STATUS - " << connectedRadio2;
-
     qDebug() << "TOP LED - " << top_led.redPower << top_led.greenPower << top_led.bluePower;
     qDebug() << "BOTTOM LED - " << bottom_led.redPower << bottom_led.greenPower << bottom_led.bluePower;
-
+    qDebug() << "TOP LED MODE - " << modeLEDTop;
+    qDebug() << "BOTTOM LED MODE - " << modeLEDBottom;
     qDebug() << "FLAT DHT - " << flat.temperature << flat.humidity;
     qDebug() << "OUTSIDE DHT - " << outside.temperature << outside.humidity;
-
     qDebug() << "NEON STATUS - " << neon;
 }

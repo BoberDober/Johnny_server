@@ -55,9 +55,10 @@ void Radio::sendData(Typewrite type, QByteArray data) // передавать ch
     QDataStream datastream(&data, QIODevice::ReadOnly);
     switch (type) {
     case LED:
-        int buffer[4];
-        datastream >> buffer[0] >> buffer[1] >> buffer[2] >> buffer[3];
-//        qDebug() << "STATUS - " << buffer[0] << buffer[1] << buffer[2] << buffer[3];
+        int buffer[5];
+        datastream >> buffer[1] >> buffer[2] >> buffer[3] >> buffer[4];
+        buffer[0] = 1;
+        qDebug() << "STATUS - " << buffer[0] << buffer[1] << buffer[2] << buffer[3] << buffer[4];
         #ifdef PI
             radio->stopListening();
             radio->openWritingPipe(pipes[3]);
@@ -66,6 +67,22 @@ void Radio::sendData(Typewrite type, QByteArray data) // передавать ch
 //                qDebug() << "---FAILED SEND DATA---";
 //            else
 //                qDebug() << "---SUCCSESS SEND DATA---";
+            radio->startListening();
+        #endif
+        break;
+    case LED_MODE:
+        int bufferLED_MODE[3];
+        datastream >> bufferLED_MODE[1] >> bufferLED_MODE[2];
+        bufferLED_MODE[0] = 2;
+//        qDebug() << "STATUS - " << bufferLED_MODE[0] << bufferLED_MODE[1];
+        #ifdef PI
+            radio->stopListening();
+            radio->openWritingPipe(pipes[3]);
+            radio->write(&bufferLED_MODE, sizeof(bufferLED_MODE));
+        //            if (!radio->write(&bufferLED_MODE, sizeof(bufferLED_MODE)))
+        //                qDebug() << "---FAILED SEND DATA---";
+        //            else
+        //                qDebug() << "---SUCCSESS SEND DATA---";
             radio->startListening();
         #endif
         break;
